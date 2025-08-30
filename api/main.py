@@ -2,8 +2,14 @@ import os
 import psycopg2
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form, status, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from passlib.hash import bcrypt
+from typing import List
+from utils import extract_text
+
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+from langchain_google_genai import ChatGoogleGenerativeAI
+import asyncio
 
 from models import CreateUser, LogUser
 
@@ -14,6 +20,16 @@ POSTGRES_CONN = {
     "password": os.getenv("PGPASSWORD", "postgres"),
     "port": os.getenv("PGPORT", "5432")
 }
+
+# Create the LLM
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
+
+# Prompt template for summarization
+prompt = PromptTemplate(
+    input_variables=["text"],
+    template="Fais moi un résumé simple et concis de ce texte:\n\n{text}"
+)
+chain = LLMChain(llm=llm, prompt=prompt)
 
 app = FastAPI()
 
@@ -79,3 +95,33 @@ def login_user(body: LogUser):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error during login: {e}",
         )
+
+@app.post("/upload")
+async def upload_files(files: List[UploadFile] = File(...), username: str = Form(...)):
+    summary = ""
+    try:
+
+        conn = psycopg2.connect(**POSTGRES_CONN)
+        cur = conn.cursor()
+
+        for file in files:
+            text = await extract_text(file)
+
+            # Generate summary with LLM
+            summary = await chain.arun(text=text)
+
+            cur.execute(
+                "INSERT INTO document (user_id, summary) VALUES (%s, %s) RETURNING id",
+                (username, summary)
+            )
+            
+        conn.commit()
+        cur.close()
+        conn.close()
+            
+        return {"success": True}
+
+    except Exception as e:
+        print("ERROR:")
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
