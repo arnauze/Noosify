@@ -50,8 +50,7 @@ def create_user(body: CreateUser):
         # From tuple to dict
         ret = cur.fetchone()
         user = {
-            "id": ret[0],
-            "username": ret[1]
+            "username": ret[0]
         }
 
         # Committing and closing the connection
@@ -96,6 +95,49 @@ def login_user(body: LogUser):
             detail=f"Error during login: {e}",
         )
 
+@app.get("/users/{userId}")
+async def get_user(userId: str):
+    try:
+        conn = psycopg2.connect(**POSTGRES_CONN)
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT 
+                u.username,
+                u.password,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'id', d.id,
+                            'summary', d.summary,
+                            'filename', d.filename,
+                            'updated_at', d.updated_at
+                        ) 
+                    ) FILTER (WHERE d.id IS NOT NULL),
+                    '[]'::json
+                ) AS documents
+            FROM users u
+            LEFT JOIN document d ON u.username = d.user_id
+            WHERE u.username = %s
+            GROUP BY u.username, u.password;
+        """, (userId,))
+        ret = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if not ret:
+            raise HTTPException(status_code=401, detail="Invalid username")
+
+        username, hashed_password, documents = ret
+
+        return {"success": True, "user": {"username": username, "documents": documents}}
+    except Exception as e:
+        print(f"Error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error when getting user: {e}",
+        )
+
 @app.post("/upload")
 async def upload_files(files: List[UploadFile] = File(...), username: str = Form(...)):
     summary = ""
@@ -111,8 +153,8 @@ async def upload_files(files: List[UploadFile] = File(...), username: str = Form
             summary = await chain.arun(text=text)
 
             cur.execute(
-                "INSERT INTO document (user_id, summary) VALUES (%s, %s) RETURNING id",
-                (username, summary)
+                "INSERT INTO document (user_id, summary, filename) VALUES (%s, %s, %s) RETURNING id",
+                (username, summary, file.filename)
             )
             
         conn.commit()

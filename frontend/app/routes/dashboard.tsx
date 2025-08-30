@@ -1,6 +1,6 @@
 import * as React from "react";
 import { User2, Lock, ArrowRight } from "lucide-react";
-import { redirect } from "react-router";
+import { redirect, useLoaderData } from "react-router";
 import { getSession } from "~/utils/session.server";
 import type { Route } from "./+types/dashboard";
 import {
@@ -8,6 +8,7 @@ import {
   parseFormData,
 } from "@remix-run/form-data-parser";
 import type { User } from "~/models/user";
+import type { Document } from "~/models/document";
 
 export async function loader({ request }: Route.LoaderArgs) {
     const session = await getSession(
@@ -16,9 +17,21 @@ export async function loader({ request }: Route.LoaderArgs) {
 
     console.log("session:", session)
 
-    if (!session.has('user')) {
+    if (!session.has('userId')) {
         return redirect("/")
     }
+
+    const userId = session.get("userId")
+
+    const res = await fetch(`${process.env.BACKEND_URL}/users/${userId}`);
+    if (!res.ok) {
+      throw new Error("Failed to fetch user documents");
+    }
+
+    const data = await res.json();
+    const user: User = data["user"]
+    return user;
+  
 }
 
 export async function action({
@@ -28,7 +41,7 @@ export async function action({
   const session = await getSession(
       request.headers.get("Cookie"),
   );
-  const user: User = session.get("user")
+  const username = session.get("userId") as string
 
   const uploadHandler = async (fileUpload: FileUpload) => {
     return fileUpload
@@ -39,7 +52,7 @@ export async function action({
     uploadHandler,
   );
 
-  formData.append("username", user.username)
+  formData.append("username", username)
 
   const res = await fetch(process.env.BACKEND_URL + "/upload", {
     method: "POST",
@@ -56,6 +69,13 @@ export default function Dashboard() {
 
   const [files, setFiles] = React.useState([]);
   const [isLoading, setIsLoading] = React.useState(false);
+  const { username, documents } = useLoaderData<{
+    username: string;
+    documents: Array<Document>;
+  }>();
+
+  console.log("DOCUMENTS:")
+  console.log(documents)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files);
@@ -66,25 +86,21 @@ export default function Dashboard() {
     <div className="relative min-h-screen w-full overflow-hidden bg-neutral-50">
       {/* Nav / Brand */}
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-        <a href="#" className="flex items-center gap-2">
+        <a href="/dashboard" className="flex items-center gap-2">
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500 text-white shadow-sm">★</span>
           <span className="text-lg font-semibold tracking-tight text-neutral-800">Noosify</span>
         </a>
       </header>
 
       {/* Main card */}
-      <main className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-10 px-6 pb-16 pt-4">
+      <main className="mx-auto grid w-full max-w-6xl grid-cols-1 items-start gap-10 px-6 pb-16 pt-4">
+
+        {/* Upload Card */}
         <div className="relative mx-auto w-full max-w-md rounded-2xl border border-neutral-200 bg-white/80 p-8 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.25)] backdrop-blur-sm">
           <div className="pointer-events-none absolute inset-x-0 -top-1 mx-auto h-1 w-40 rounded-full" />
-
           <h2 className="text-xl font-semibold text-neutral-800 mb-4">Upload tes fichiers</h2>
 
-          {/* Form that calls your route action */}
-          <form
-            method="post"
-            encType="multipart/form-data"
-            className="space-y-4"
-          >
+          <form method="post" encType="multipart/form-data" className="space-y-4" onSubmit={() => setIsLoading(true)}>
             {/* Upload area */}
             <label
               htmlFor="file-upload"
@@ -104,7 +120,7 @@ export default function Dashboard() {
               <input
                 id="file-upload"
                 type="file"
-                name="files"    // ✅ important so it arrives in action()
+                name="files"
                 multiple
                 onChange={handleFileChange}
                 className="hidden"
@@ -129,12 +145,62 @@ export default function Dashboard() {
             {/* Upload button */}
             <button
               type="submit"
-              className="w-full mt-4 inline-flex items-center justify-center rounded-lg bg-rose-500 px-4 py-2 text-white font-semibold shadow-sm hover:bg-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:ring-offset-1 transition"
+              disabled={isLoading}
+              className="w-full mt-4 inline-flex items-center justify-center rounded-lg bg-rose-500 px-4 py-2 text-white font-semibold shadow-sm 
+                        hover:bg-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:ring-offset-1 transition
+                        disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              Upload
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <svg
+                    className="w-5 h-5 animate-spin text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 100 16v-4l-3 3 3 3v-4a8 8 0 01-8-8z"
+                    />
+                  </svg>
+                  Synthétisation des documents...
+                </span>
+              ) : (
+                "Upload"
+              )}
             </button>
           </form>
         </div>
+
+        {/* Documents List */}
+        <div className="grid w-full max-w-6xl grid-cols-1 gap-6">
+          {documents.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).map((doc) => (
+            <div
+              key={doc.id}
+              className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-md hover:shadow-lg transition-shadow"
+            >
+              <p className="font-bold text-sm text-neutral-600 mb-2">
+                Filename: {doc.filename}
+              </p>
+              <p className="text-sm text-neutral-600 mb-2">
+                Updated at: {new Date(doc.updated_at).toLocaleString()}
+              </p>
+              <p className="text-neutral-800 text-base whitespace-pre-wrap">
+                {doc.summary}
+              </p>
+            </div>
+          ))}
+        </div>
+
       </main>
     </div>
   );

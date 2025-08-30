@@ -4,6 +4,7 @@ from typing import List, Optional
 
 class Document(BaseModel):
     id: int
+    filename: str
     user_id: str
     summary: Optional[str]
     updated_at: Optional[datetime]

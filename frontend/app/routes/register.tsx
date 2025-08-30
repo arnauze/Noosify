@@ -44,7 +44,7 @@ export async function action({
   console.log("Got the user:")
   console.log(user)
 
-  session.set("user", user);
+  session.set("userId", user.username);
 
   return redirect("/dashboard", {
     headers: {
@@ -66,7 +66,7 @@ export default function RegisterPage() {
     <div className="relative min-h-screen w-full overflow-hidden bg-neutral-50">
       {/* Nav / Brand */}
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-        <a href="#" className="flex items-center gap-2">
+        <a href="/dashboard" className="flex items-center gap-2">
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500 text-white shadow-sm">
             ★
           </span>

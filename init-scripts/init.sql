@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 CREATE TABLE IF NOT EXISTS document (
     id SERIAL PRIMARY KEY,
+    filename TEXT,
     user_id TEXT REFERENCES users(username) ON DELETE CASCADE,
     summary TEXT,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
