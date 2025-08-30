@@ -10,6 +10,7 @@ import {
 import type { User } from "~/models/user";
 import type { Document } from "~/models/document";
 import Header from "~/components/Header";
+import DocumentCard from "~/components/DocumentCard";
 
 export async function loader({ request }: Route.LoaderArgs) {
     const session = await getSession(
@@ -185,20 +186,7 @@ export default function Dashboard() {
         {/* Documents List */}
         <div className="grid w-full max-w-6xl grid-cols-1 gap-6">
           {documents.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).map((doc) => (
-            <div
-              key={doc.id}
-              className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-md hover:shadow-lg transition-shadow"
-            >
-              <p className="font-bold text-sm text-neutral-600 mb-2">
-                Filename: {doc.filename}
-              </p>
-              <p className="text-sm text-neutral-600 mb-2">
-                Updated at: {new Date(doc.updated_at).toLocaleString()}
-              </p>
-              <p className="text-neutral-800 text-base whitespace-pre-wrap">
-                {doc.summary}
-              </p>
-            </div>
+            <DocumentCard doc={doc} />
           ))}
         </div>
 
