@@ -1,6 +1,6 @@
 import * as React from "react";
 import { User2, Lock, ArrowRight } from "lucide-react";
-import { redirect, useLoaderData } from "react-router";
+import { redirect, useActionData, useLoaderData } from "react-router";
 import { getSession } from "~/utils/session.server";
 import type { Route } from "./+types/dashboard";
 import {
@@ -9,13 +9,12 @@ import {
 } from "@remix-run/form-data-parser";
 import type { User } from "~/models/user";
 import type { Document } from "~/models/document";
+import Header from "~/components/Header";
 
 export async function loader({ request }: Route.LoaderArgs) {
     const session = await getSession(
         request.headers.get("Cookie"),
     );
-
-    console.log("session:", session)
 
     if (!session.has('userId')) {
         return redirect("/")
@@ -59,8 +58,9 @@ export async function action({
     body: formData,
   });
 
-  if (res.ok) {
-    // Query the user informations and update the session
+  if (!res.ok) {
+    const errorText = await res.text();
+    return JSON.parse(errorText)
   }
 
 }
@@ -73,9 +73,7 @@ export default function Dashboard() {
     username: string;
     documents: Array<Document>;
   }>();
-
-  console.log("DOCUMENTS:")
-  console.log(documents)
+  const actionData = useActionData();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files);
@@ -84,13 +82,8 @@ export default function Dashboard() {
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-neutral-50">
-      {/* Nav / Brand */}
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-        <a href="/dashboard" className="flex items-center gap-2">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500 text-white shadow-sm">★</span>
-          <span className="text-lg font-semibold tracking-tight text-neutral-800">Noosify</span>
-        </a>
-      </header>
+
+      <Header />
 
       {/* Main card */}
       <main className="mx-auto grid w-full max-w-6xl grid-cols-1 items-start gap-10 px-6 pb-16 pt-4">
@@ -179,6 +172,12 @@ export default function Dashboard() {
               )}
             </button>
           </form>
+
+          {/* Error message */}
+          {actionData?.detail && (
+            <p className="pt-2 text-center text-sm text-red-500 font-medium">{actionData.detail}</p>
+          )}
+          
         </div>
 
         {/* Documents List */}

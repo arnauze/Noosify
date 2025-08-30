@@ -4,6 +4,7 @@ import type { Route } from "./+types/register";
 import { commitSession, getSession } from  "~/utils/session.server";
 import { redirect, useActionData } from "react-router";
 import type { User } from "~/models/user";
+import Header from "~/components/Header";
 
 export async function action({
   request,
@@ -31,8 +32,6 @@ export async function action({
     body: body
   })
 
-  console.log("response", response)
-
   if (!response.ok) {
     const errorText = await response.text();
     return JSON.parse(errorText)
@@ -40,9 +39,6 @@ export async function action({
 
   const data = await response.json()
   const user = data["user"] as User
-
-  console.log("Got the user:")
-  console.log(user)
 
   session.set("userId", user.username);
 
@@ -64,17 +60,8 @@ export default function RegisterPage() {
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-neutral-50">
-      {/* Nav / Brand */}
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-        <a href="/dashboard" className="flex items-center gap-2">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500 text-white shadow-sm">
-            ★
-          </span>
-          <span className="text-lg font-semibold tracking-tight text-neutral-800">
-            Noosify
-          </span>
-        </a>
-      </header>
+      
+      <Header />
 
       {/* Main card */}
       <main className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-10 px-6 pb-16 pt-4">
@@ -158,6 +145,7 @@ export default function RegisterPage() {
               </div>
             </label>
 
+            {/* Error message */}
             {actionData?.detail && (
               <p className="pt-2 text-center text-sm text-red-500 font-medium">{actionData.detail}</p>
             )}
