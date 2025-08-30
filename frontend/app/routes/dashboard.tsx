@@ -67,7 +67,7 @@ export async function action({
 
 export default function Dashboard() {
 
-  const [files, setFiles] = React.useState([]);
+  const [files, setFiles] = React.useState<File[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const { username, documents } = useLoaderData<{
     username: string;
@@ -76,6 +76,8 @@ export default function Dashboard() {
   const actionData = useActionData();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files)
+      return;
     const selectedFiles = Array.from(e.target.files);
     setFiles((prev) => [...prev, ...selectedFiles]);
   };
@@ -177,7 +179,7 @@ export default function Dashboard() {
           {actionData?.detail && (
             <p className="pt-2 text-center text-sm text-red-500 font-medium">{actionData.detail}</p>
           )}
-          
+
         </div>
 
         {/* Documents List */}
