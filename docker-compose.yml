@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  frontend:
+    container_name: frontend
+    image: frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: ./Dockerfile
+    hostname: "frontend"
+    environment:
+      BACKEND_URL: http://api:8000
+    ports:
+      - "5173:5173"
+  
+  db:
+    image: pgvector/pgvector:pg17-trixie
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+  
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: api
+    hostname: "api"
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./api:/app
+    ports:
+      - "8000:8000"
