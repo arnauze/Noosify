@@ -9,7 +9,6 @@ from utils import extract_text
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain_google_genai import ChatGoogleGenerativeAI
-import asyncio
 
 from models import CreateUser, LogUser
 
@@ -21,10 +20,8 @@ POSTGRES_CONN = {
     "port": os.getenv("PGPORT", "5432")
 }
 
-# Create the LLM
+# Instantiation du LLM
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
-
-# Prompt template for summarization
 prompt = PromptTemplate(
     input_variables=["text"],
     template="Fais moi un résumé simple et concis de ce texte:\n\n{text}"
@@ -35,6 +32,26 @@ app = FastAPI()
 
 @app.post("/users/create")
 def create_user(body: CreateUser):
+    """
+    Create a new user in the system.
+
+    - Hashes the provided password using bcrypt
+    - Inserts the new user into the database.
+    - Returns the created username.
+
+    Args:
+        body (CreateUser): Pydantic model containing `username` and `password`.
+
+    Returns:
+        dict: {
+            "success": True,
+            "user": {"username": str},
+            "error": None
+        }
+
+    Raises:
+        HTTPException: 500 if database insert fails.
+    """
     try:
         conn = psycopg2.connect(**POSTGRES_CONN)
         cur = conn.cursor()
@@ -69,6 +86,27 @@ def create_user(body: CreateUser):
 
 @app.post("/users/login")
 def login_user(body: LogUser):
+    """
+    Authenticate a user by verifying credentials.
+
+    - Checks if the provided username exists.
+    - Verifies the password against the stored bcrypt hash.
+    - Returns the username if authentication succeeds.
+
+    Args:
+        body (LogUser): Pydantic model containing `username` and `password`.
+
+    Returns:
+        dict: {
+            "success": True,
+            "user": {"username": str}
+        }
+
+    Raises:
+        HTTPException:
+            - 401 if invalid credentials.
+            - 500 if database query fails.
+    """
     try:
         conn = psycopg2.connect(**POSTGRES_CONN)
         cur = conn.cursor()
@@ -97,6 +135,28 @@ def login_user(body: LogUser):
 
 @app.get("/users/{userId}")
 async def get_user(userId: str):
+    """
+    Retrieve user details along with their uploaded documents.
+
+    - Fetches username and associated documents from the database.
+
+    Args:
+        userId (str): The username to look up.
+
+    Returns:
+        dict: {
+            "success": True,
+            "user": {
+                "username": str,
+                "documents": List[dict]
+            }
+        }
+
+    Raises:
+        HTTPException:
+            - 401 if username not found.
+            - 500 if database query fails.
+    """
     try:
         conn = psycopg2.connect(**POSTGRES_CONN)
         cur = conn.cursor()
@@ -140,6 +200,26 @@ async def get_user(userId: str):
 
 @app.post("/upload")
 async def upload_files(files: List[UploadFile] = File(...), username: str = Form(...)):
+    """
+    Upload and summarize documents for a user.
+
+    - Accepts multiple file types (PDF, DOCX, TXT).
+    - Extracts text content using helper function `extract_text`.
+    - Summarizes the content with the LLM chain.
+    - Stores document info (summary, filename) in the database.
+
+    Args:
+        files (List[UploadFile]): Uploaded files.
+        username (str): The user who uploaded the files.
+
+    Returns:
+        dict: {
+            "success": True
+        }
+
+    Raises:
+        HTTPException: 500 if processing or database insertion fails.
+    """
     summary = ""
     try:
 
